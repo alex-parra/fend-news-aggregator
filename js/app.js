@@ -9,6 +9,7 @@ APP.Main = (function() {
   var storyStart = 0;
   var storiesBatch = 100;
   var storyLoadCount = 0;
+  var storiesDetails = [];
 
   var $main = $('main');
   var inDetails = false;
@@ -61,9 +62,7 @@ APP.Main = (function() {
       
       case 'getStoryCommentResult':
         var commentDetails = e.data.commentDetails;
-        commentDetails.time *= 1000;
-        var comment = $('#storyDetailView').querySelector('#sdc-' + commentDetails.id);
-        comment.innerHTML = storyDetailsCommentTemplate(commentDetails, localeData);
+        requestAnimationFrame(renderComment.bind(this, commentDetails));
       break;
     }
 
@@ -76,26 +75,13 @@ APP.Main = (function() {
 
 // APP FUNCTIONS
 
-  $main.addEventListener('scroll', function(){
-    var header = $('header');
-    var headerTitles = header.querySelector('.header__title-wrapper');
-    var scrollTopCapped = Math.min(70, $main.scrollTop);
-    var scaleString = 'scale(' + (1 - (scrollTopCapped / 300)) + ')';
-
-    header.style.height = (156 - scrollTopCapped) + 'px';
-    headerTitles.style.webkitTransform = scaleString;
-    headerTitles.style.transform = scaleString;
-
-    // Add a shadow to the header.
-    if( $main.scrollTop > 70 )
-      document.body.classList.add('raised');
-    else
-      document.body.classList.remove('raised');
-
-
-    // Check if we need to load the next batch of stories.
-    var loadThreshold = ($main.scrollHeight - $main.offsetHeight - LAZY_LOAD_THRESHOLD);
-    if( $main.scrollTop > loadThreshold ) requestAnimationFrame(loadStoryBatch);
+  $main.addEventListener('click', function(e){
+    if( e.target && e.target.matches(".story.clickable, .story.clickable *") ) {
+      e.stopPropagation();
+      var storyEl = findAncestor(e.target, '.story');
+      var storyId = storyEl.getAttribute('id').replace('s-', '');
+      onStoryClick.call(this, storiesDetails[storyId]);
+    }
   });
 
 
@@ -127,7 +113,7 @@ APP.Main = (function() {
 
     storyStart += storiesBatch;
 
-    requestAnimationFrame(loadStoryBatch);
+    //requestAnimationFrame(loadStoryBatch);
   }
 
 
@@ -136,21 +122,32 @@ APP.Main = (function() {
     details.time *= 1000;
     var html = storyTemplate(details);
     story.innerHTML = html;
-    story.addEventListener('click', onStoryClick.bind(this, details));
+    //story.addEventListener('click', onStoryClick.bind(this, details));
+    storiesDetails[key] = details;
     story.classList.add('clickable');
 
     // Tick down. When zero we can batch in the next load.
     storyLoadCount--;
   }
 
+
+
   function onStoryClick(storyDetails) {
     var storyDetailsView = $('#storyDetailView');
 
+    // Check if storyDetailsView exists. If not, create it once
     if( !storyDetailsView ) {
       storyDetailsView = document.createElement('section');
       storyDetailsView.setAttribute('id', 'storyDetailView');
       storyDetailsView.classList.add('story-details');
       document.body.appendChild(storyDetailsView);
+      
+      storyDetailsView.addEventListener('click', function(e){
+        if (e.target && e.target.matches(".js-close")) {
+          e.stopPropagation();
+          $('#storyDetailView').classList.remove('open');
+        }
+      });
     }
 
     if (storyDetails.url) storyDetails.urlobj = new URL(storyDetails.url);
@@ -166,17 +163,12 @@ APP.Main = (function() {
       by: '', text: 'Loading comment...'
     });
 
-
+    // Populate the View Pane with Story Details
     storyDetailsView.innerHTML = storyDetailsHtml;
 
     commentsElement = storyDetailsView.querySelector('.js-comments');
     storyHeader = storyDetailsView.querySelector('.js-header');
     storyContent = storyDetailsView.querySelector('.js-content');
-
-    var closeButton = storyDetailsView.querySelector('.js-close');
-    closeButton.addEventListener('click', function(){
-      $('#storyDetailView').classList.remove('open');
-    });
 
     var headerHeight = storyHeader.getBoundingClientRect().height;
     storyContent.style.paddingTop = headerHeight + 'px';
@@ -199,9 +191,49 @@ APP.Main = (function() {
       }
     }
 
+  } // onStoryClick
 
 
+  function renderComment(commentDetails) {
+    commentDetails.time *= 1000;
+    var comment = $('#storyDetailView').querySelector('#sdc-' + commentDetails.id);
+    comment.innerHTML = storyDetailsCommentTemplate(commentDetails, localeData);
   }
 
 
+  $main.addEventListener('scroll', function(){
+    var header = $('header');
+    var headerTitles = header.querySelector('.header__title-wrapper');
+    var scrollTopCapped = Math.min(70, $main.scrollTop);
+    var scaleString = 'scale(' + (1 - (scrollTopCapped / 300)) + ')';
+
+    header.style.height = (156 - scrollTopCapped) + 'px';
+    headerTitles.style.webkitTransform = scaleString;
+    headerTitles.style.transform = scaleString;
+
+    // Add a shadow to the header.
+    if( $main.scrollTop > 70 )
+      document.body.classList.add('raised');
+    else
+      document.body.classList.remove('raised');
+
+
+    // Check if we need to load the next batch of stories.
+    var loadThreshold = ($main.scrollHeight - $main.offsetHeight - LAZY_LOAD_THRESHOLD);
+    if( $main.scrollTop > loadThreshold ) {
+      requestAnimationFrame(loadStoryBatch);
+    }
+  });
+
+
 })(); // App.Main
+
+
+
+
+
+// Assorted Helpers
+function findAncestor(el, sel) {
+  while ((el = el.parentElement) && !((el.matches || el.matchesSelector).call(el,sel)));
+  return el;
+}
