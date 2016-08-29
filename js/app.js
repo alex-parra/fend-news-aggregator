@@ -95,7 +95,7 @@ APP.Main = (function() {
 
     // Check if we need to load the next batch of stories.
     var loadThreshold = ($main.scrollHeight - $main.offsetHeight - LAZY_LOAD_THRESHOLD);
-    if( $main.scrollTop > loadThreshold ) loadStoryBatch();
+    if( $main.scrollTop > loadThreshold ) requestAnimationFrame(loadStoryBatch);
   });
 
 
